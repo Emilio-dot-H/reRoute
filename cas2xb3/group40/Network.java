@@ -1,24 +1,51 @@
 package cas2xb3.group40;
 
+import java.awt.List;
+import java.util.ArrayList;
+
 public class Network {
 
     private Intersection[] intsecs;
     private int nV;
     private int nE;
-
+    private Bag<Intersection>[] adj;
+	
     public Network(int cap){
         intsecs = new Intersection[cap];
     }
+    public void adjInit(){
+    	int k = nV;
+    	adj = (Bag<Intersection>[]) new Bag[k]; //Create array of lists
+        for(int v=0; v<k; v++){ // Initialize all lists
+			adj[v] = new Bag<Intersection>(); // to empty
+			// Just created an empty array list the same size as the # of vertices
+        }
+    }
 
-    public void addIntersection(Intersection i) {
-        intsecs[i.getId()] = i;
+    public void addIntersection(Intersection i) { //i and j are the same intersection, different types.
+    	int k = i.getId();
+    	intsecs[k] = i;
         nV++;
+        adjInit();
+        
     }
-
-    public Intersection get(int i) {
-        return intsecs[i];
+    public void edgeDetection(Intersection a, Intersection b, Intersection c){
+    	double dist1 = a.getDistance(c); //distance from a to c
+    	double dist2 = b.getDistance(c); //distance from b to c
+    	if(dist2 < dist1 /* & both lead to the same path*/ ){
+    		addEdge(a, c);
+    	}
     }
-
+    public Intersection get(int i){
+    	return intsecs[i];
+    }
+    public void addEdge(Intersection v, Intersection w){ 
+		int g = v.getId();
+		int h = w.getId();
+    	adj[g].add(w); //Add w to v's list.
+		adj[h].add(v);// Add v to w's list 
+		nE++ ;
+	}
     /*
     public void addEdge(Intersection v, Intersection w){
         //Add an edge from v to w (symmetrically).
