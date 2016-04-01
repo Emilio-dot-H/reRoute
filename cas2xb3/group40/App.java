@@ -1,56 +1,96 @@
 package cas2xb3.group40;
 
 import javafx.application.Application;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.concurrent.Service;
+import javafx.concurrent.Task;
+import javafx.concurrent.WorkerStateEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 public class App extends Application {
 
     private final String TITLE = "reRoute";
-    private final Color BACKGROUND_COLOR = Color.DARKSEAGREEN;
+    private final Color MAP_BACKGROUND_COLOR = Color.DARKSEAGREEN;
+    private final Color LOAD_BACKGROUND_COLOR = Color.WHITE;
     private double mouseX, mouseY;
 
     private void initUI(Stage stage) {
+        stage.setTitle(TITLE);
+
+        Pane load = new StackPane();
+        Scene loadScene = new Scene(load, 500, 500, LOAD_BACKGROUND_COLOR);
+        Image imgLogo = new Image("file:data/logo.png");
+        ImageView imgViewLogo = new ImageView(imgLogo);
+        load.getChildren().add(imgViewLogo);
+
+        Pane root = new Pane();
+        Scene mapScene = new Scene(root, 500, 500, MAP_BACKGROUND_COLOR);
+        stage.setScene(loadScene);
+
+        stage.show();
 
         Parser p = new Parser();
         Network net = new Network(p.numLines());
-        //Camera cam = new Camera(122.30, 47.60, 122.43, 47.76);
-        Camera cam = new Camera(122.30, 47.60, 122.33, 47.64);
+        Camera cam = new Camera(122.30, 47.60, 122.33, 47.64, stage.getWidth(), stage.getHeight());
+            // different aspect ratio
+            //Camera cam = new Camera(122.30, 47.60, 122.43, 47.76);
 
-        // build network
-        for (int i = 0; i < p.numLines(); i++) {
-            String[] data = p.readLine();
-            Intersection a = new Intersection(data[8] + " and " + data[9],
-                                              Math.abs(Double.parseDouble(data[12]) ),
-                                              Math.abs(Double.parseDouble(data[11]) ) );
-            net.addIntersection(a);
-        }
+/*        new Thread() {
+            public void run() {
+                // build network
+                Network.buildNetwork(net, p);
 
-        // parser obj no longer required
-        p = null;
+                // add shapes to root pane
+                root.getChildren().addAll(cam.filterVisible(net));
 
-        // for each intersection in network
-        // find all intersections on road A
-        // find closest 2 intersections
-        // if d(1,3) < d(2,3)
-        // add both intersections to adjacency
-        // if d(1,2) > d(2,3)
-        // add only closer node
-        // repeat for road B
+                // parser obj no longer required
+                p.destructor();
 
-        Pane root = new Pane();
-        root.getChildren().addAll(cam.filterVisible(net));
+                stage.setScene(mapScene);
+            }
+        }.start();*/
 
-        Scene scene = new Scene(root, 500, 500, BACKGROUND_COLOR);
+        Service<Void> service = new Service<Void>() {
+            @Override
+            protected Task<Void> createTask() {
+                return new Task<Void>() {
+                    @Override
+                    protected Void call() throws Exception {
+                        // build network
+                        Network.buildNetwork(net, p);
 
-        scene.setOnMousePressed(new EventHandler<MouseEvent>() {
+                        return null;
+                    }
+                };
+            }
+        };
+        service.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+            @Override
+            public void handle(WorkerStateEvent workerStateEvent) {
+                // add shapes to root pane
+                root.getChildren().addAll(cam.filterVisible(net));
+
+                // parser obj no longer required
+                p.destructor();
+
+                stage.setScene(mapScene);
+            }
+        });
+        service.start();
+
+        // mouse click handler
+        mapScene.setOnMousePressed(new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent mouseEvent) {
                 mouseX = mouseEvent.getSceneX();
@@ -58,7 +98,8 @@ public class App extends Application {
             }
         });
 
-        scene.setOnMouseReleased(new EventHandler<MouseEvent>() {
+        // pan handler
+        mapScene.setOnMouseReleased(new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent mouseEvent) {
                 double mousedx = mouseEvent.getSceneX() - mouseX;
@@ -69,7 +110,8 @@ public class App extends Application {
             }
         });
 
-        scene.setOnKeyPressed(new EventHandler<KeyEvent>() {
+        // zoom handler
+        mapScene.setOnKeyPressed(new EventHandler<KeyEvent>() {
             @Override
             public void handle(KeyEvent keyEvent) {
                 if (keyEvent.getCode() == KeyCode.EQUALS) {
@@ -82,9 +124,20 @@ public class App extends Application {
             }
         });
 
-        stage.setTitle(TITLE);
-        stage.setScene(scene);
-        stage.show();
+        // windows resize handler
+        mapScene.widthProperty().addListener(new ChangeListener<Number>() {
+            @Override public void changed(ObservableValue<? extends Number> observableValue, Number oldSceneWidth, Number newSceneWidth) {
+                cam.setResX(newSceneWidth.intValue());
+                root.getChildren().addAll(cam.filterVisible(net));
+            }
+        });
+
+        // window resize handler
+        mapScene.heightProperty().addListener(new ChangeListener<Number>() {
+            @Override public void changed(ObservableValue<? extends Number> observableValue, Number oldSceneHeight, Number newSceneHeight) {
+                cam.setResY(newSceneHeight.intValue());
+            }
+        });
     }
 
     @Override
